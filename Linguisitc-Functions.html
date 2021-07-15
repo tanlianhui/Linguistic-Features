@@ -171,8 +171,200 @@ pre code {
 </div>
 
 
+<pre class="r"><code>library(rjson)
+library(readxl)
+library(dplyr)</code></pre>
+<pre><code>#&gt; 
+#&gt; Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>#&gt; The following objects are masked from &#39;package:stats&#39;:
+#&gt; 
+#&gt;     filter, lag</code></pre>
+<pre><code>#&gt; The following objects are masked from &#39;package:base&#39;:
+#&gt; 
+#&gt;     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(rms)</code></pre>
+<pre><code>#&gt; Loading required package: Hmisc</code></pre>
+<pre><code>#&gt; Loading required package: lattice</code></pre>
+<pre><code>#&gt; Loading required package: survival</code></pre>
+<pre><code>#&gt; Loading required package: Formula</code></pre>
+<pre><code>#&gt; Loading required package: ggplot2</code></pre>
+<pre><code>#&gt; 
+#&gt; Attaching package: &#39;Hmisc&#39;</code></pre>
+<pre><code>#&gt; The following objects are masked from &#39;package:dplyr&#39;:
+#&gt; 
+#&gt;     src, summarize</code></pre>
+<pre><code>#&gt; The following objects are masked from &#39;package:base&#39;:
+#&gt; 
+#&gt;     format.pval, units</code></pre>
+<pre><code>#&gt; Loading required package: SparseM</code></pre>
+<pre><code>#&gt; 
+#&gt; Attaching package: &#39;SparseM&#39;</code></pre>
+<pre><code>#&gt; The following object is masked from &#39;package:base&#39;:
+#&gt; 
+#&gt;     backsolve</code></pre>
+<pre class="r"><code>json_list &lt;- fromJSON(file=&quot;C:/Users/user/Desktop/University/Extra Studies &amp; Others&#39;/Classic Thesis/Linguistics/semantics/ABSA/Linguistic Function/cht0714_ctxdep.json&quot;)
+seeds_loc &lt;- &quot;C:/Users/user/Desktop/University/Extra Studies &amp; Others&#39;/Classic Thesis/Linguistics/semantics/ABSA/Linguistic Function/seeds_(客服)_1100223.xlsx&quot;
+predict_loc &lt;- &quot;C:/Users/user/Desktop/University/Extra Studies &amp; Others&#39;/Classic Thesis/Linguistics/semantics/ABSA/Linguistic Function/ctx_predict.xlsx&quot;
+
+df&lt;-data.frame()
+for (i in 1:582){
+    isCorrect&lt;-json_list[[i]]$isCorrect
+    row_idx&lt;-json_list[[i]]$row_idx
+    text&lt;-json_list[[i]]$text
+    token_dep&lt;-json_list[[i]]$token_dep%&gt;%
+        unlist() %&gt;%
+        data.frame() %&gt;%
+        mutate(rn = ceiling(row_number() / 5)) %&gt;%
+        group_by(rn) %&gt;%
+        summarise(vlist = paste0(., collapse = &quot;/&quot;)) %&gt;%
+        ungroup() %&gt;%
+        select(vlist) %&gt;%
+        t() %&gt;%
+        paste(collapse = &quot;\u3000&quot;)
+
+    row&lt;-cbind(isCorrect, row_idx, text, token_dep)
+    df&lt;-rbind(df, row)
+}
+
+df_error&lt;-df%&gt;%filter(isCorrect==0)
+
+read_excel_allsheets &lt;- function(filename, tibble = FALSE) {
+    sheets &lt;- readxl::excel_sheets(filename)
+    x &lt;- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    if(!tibble) x &lt;- lapply(x, as.data.frame)
+    names(x) &lt;- sheets
+    x
+}
+
+seeds&lt;-read_excel_allsheets(seeds_loc)</code></pre>
+<pre><code>#&gt; New names:
+#&gt; * `` -&gt; ...5
+#&gt; * `` -&gt; ...6
+#&gt; * `` -&gt; ...7
+#&gt; * `` -&gt; ...8
+#&gt; * `` -&gt; ...9
+#&gt; * ...</code></pre>
+<pre><code>#&gt; New names:
+#&gt; * `` -&gt; ...5
+#&gt; * `` -&gt; ...6
+#&gt; * `` -&gt; ...7
+#&gt; * `` -&gt; ...8
+#&gt; * `` -&gt; ...9
+#&gt; * ...</code></pre>
+<pre><code>#&gt; New names:
+#&gt; * `` -&gt; ...2
+#&gt; * `` -&gt; ...3
+#&gt; * `` -&gt; ...4
+#&gt; * `` -&gt; ...5
+#&gt; * `` -&gt; ...6
+#&gt; * ...</code></pre>
+<pre class="r"><code>predict&lt;-read_excel_allsheets(predict_loc)</code></pre>
+<pre><code>#&gt; New names:
+#&gt; * `` -&gt; ...1</code></pre>
+<pre><code>#&gt; New names:
+#&gt; * `` -&gt; ...1
+#&gt; * `` -&gt; ...7</code></pre>
+<pre><code>#&gt; New names:
+#&gt; * Negative -&gt; Negative...3
+#&gt; * Negative -&gt; Negative...4</code></pre>
+<pre class="r"><code>predict_error&lt;-predict$error %&gt;% 
+    as.data.frame() %&gt;%
+    filter(is.na(...7)) %&gt;%
+    select(contexts, notes_2)</code></pre>
 <div id="data-manipulation" class="section level1">
 <h1>Data Manipulation</h1>
+<pre class="r"><code># collect entities in `seeds` into `entities`
+entities&lt;-seeds$`seeds (客服)0223`[2:7,3:25]%&gt;%as_tibble()
+
+# `splitslash` function simplifies the codes in `ent_num` below
+splitslash&lt;-function(x){
+    s&lt;-strsplit(x, split=&quot;/&quot;)%&gt;%unlist()
+    return(s[1])
+}
+# `ent_num` function uses TFlist to collect entity counts, based on `strsplit` twice by &quot;\u3000&quot; and &quot;/&quot;
+ent_num&lt;-function(x){
+    TFlist&lt;-list()
+    str&lt;-strsplit(x, split = &quot;\u3000&quot;) %&gt;% unlist()
+    wordlist&lt;-lapply(str, splitslash) %&gt;% unlist()
+    for (i in wordlist){
+        TFlist&lt;-append(TFlist, (any(entities==i, na.rm = TRUE)))
+    }
+    return(TFlist%&gt;%unlist()%&gt;%sum())
+}
+# `all_table` combines two tables for future comparisons
+all_table&lt;-left_join(df, predict_error, by=c(&quot;text&quot;=&quot;contexts&quot;))%&gt;%
+    rowwise()%&gt;%
+    mutate(entity_count = ent_num(token_dep))</code></pre>
+<pre class="r"><code>all_table&lt;-all_table%&gt;%mutate(word_count = nchar(text))</code></pre>
+<pre class="r"><code>all_table&lt;-all_table%&gt;%
+    mutate(above43 = if_else(condition = as.numeric(word_count)&gt;43, 
+                                     true = TRUE, false = FALSE))</code></pre>
+<pre class="r"><code>findqs&lt;-function(x){
+    return(grepl(&quot;rhetorical&quot;, x))
+}
+all_table&lt;-all_table%&gt;%
+    mutate(ifQuestion = findqs(notes_2))
+# flaw: cannot see unannotated predictions that might be either correct or wrong</code></pre>
+<pre class="r"><code>findsign&lt;-function(x){
+    return(grepl(&quot;[&gt;=&lt;^❤️🤔🤔🤣🥺😂]&quot;, x))
+}
+all_table&lt;-all_table%&gt;%
+    mutate(ifSign = findsign(text))</code></pre>
+<pre class="r"><code>mostly_adj&lt;-all_table$token_dep%&gt;%
+    as.character%&gt;%
+    strsplit(&quot;(\u3000)|(\&quot;, \&quot;)&quot;)%&gt;%
+    unlist()%&gt;%
+    as.data.frame()%&gt;%
+    filter(grepl(&quot;VA/[^(dep)]&quot;, x=.))
+
+adj_num&lt;-function(x){
+    ls&lt;-list()
+    num&lt;-x%&gt;%
+        strsplit(&quot;\u3000&quot;)%&gt;%
+        unlist()
+    for (i in num){
+        ls&lt;-append(ls, (grepl(&quot;VA/[^(dep)]&quot;, i)))
+    }
+    return(ls%&gt;%unlist()%&gt;%sum())
+}
+
+all_table&lt;-all_table%&gt;%
+    mutate(adj_count = adj_num(token_dep))</code></pre>
+<pre class="r"><code># (annotators&#39; choice)
+findsarcasm&lt;-function(x){
+    return(grepl(&quot;sarcasm&quot;, x))
+}
+all_table&lt;-all_table%&gt;%
+    mutate(ifSarcasm = findsarcasm(notes_2))
+# flaw: cannot see unannotated predictions that might be either correct or wrong</code></pre>
+<pre class="r"><code>conj_num&lt;-function(x){
+    conjunctions&lt;-c(&quot;但&quot;, &quot;除(了|外|非)?&quot;, &quot;卻&quot;)
+    TFlist&lt;-list()
+    str&lt;-strsplit(x, split = &quot;\u3000&quot;) %&gt;% unlist()
+    wordlist&lt;-lapply(str, splitslash) %&gt;% unlist()
+    for (i in wordlist){
+        TFlist&lt;-append(TFlist, (any(conjunctions==i, na.rm = TRUE)))
+    }
+    return(TFlist%&gt;%unlist()%&gt;%sum())
+}
+
+all_table&lt;-all_table%&gt;%
+    rowwise()%&gt;%
+    mutate(conj_count = conj_num(token_dep))</code></pre>
+<pre class="r"><code>neg_num&lt;-function(x){
+    negations&lt;-c(&quot;不&quot;, &quot;沒有&quot;)
+    TFlist&lt;-list()
+    str&lt;-strsplit(x, split = &quot;\u3000&quot;) %&gt;% unlist()
+    wordlist&lt;-lapply(str, splitslash) %&gt;% unlist()
+    for (i in wordlist){
+        TFlist&lt;-append(TFlist, (any(negations==i, na.rm = TRUE)))
+    }
+    return(TFlist%&gt;%unlist()%&gt;%sum())
+}
+
+all_table&lt;-all_table%&gt;%
+    rowwise()%&gt;%
+    mutate(neg_count = neg_num(token_dep))</code></pre>
 </div>
 <div id="lrm-result-one-by-one" class="section level1">
 <h1>LRM result (one by one)</h1>
@@ -187,23 +379,40 @@ all_table$ifSarcasm &lt;- factor(all_table$ifSarcasm)
 all_table$conj_count &lt;- factor(all_table$conj_count)
 all_table$neg_count &lt;- factor(all_table$neg_count)</code></pre>
 <pre class="r"><code>result1 &lt;- lrm(isCorrect ~ entity_count, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ entity_count, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>result1</code></pre>
-<pre><code>#&gt; Error in eval(expr, envir, enclos): 找不到物件 &#39;result1&#39;</code></pre>
-<pre class="r"><code>rms::vif(result1)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result1&#39;</code></pre>
-<pre class="r"><code># Should print out:
+              data = all_table, x = T, y = T)
+result1
+rms::vif(result1)
+# Should print out:
 # entity_count=1 entity_count=2 entity_count=3 entity_count=4 entity_count=5 
 # 1.114813       1.088053       1.031909       1.007573       1.000011 </code></pre>
+<pre><code>#&gt; Logistic Regression Model
+#&gt;  
+#&gt;  lrm(formula = isCorrect ~ entity_count, data = all_table, x = T, 
+#&gt;      y = T)
+#&gt;  
+#&gt;                        Model Likelihood    Discrimination    Rank Discrim.    
+#&gt;                              Ratio Test           Indexes          Indexes    
+#&gt;  Obs           588    LR chi2     12.96    R2       0.032    C       0.579    
+#&gt;   0            152    d.f.            5    g        0.331    Dxy     0.158    
+#&gt;   1            436    Pr(&gt; chi2) 0.0237    gr       1.392    gamma   0.261    
+#&gt;  max |deriv| 0.001                         gp       0.061    tau-a   0.061    
+#&gt;                                            Brier    0.187                     
+#&gt;  
+#&gt;                 Coef    S.E.    Wald Z Pr(&gt;|Z|)
+#&gt;  Intercept       1.3698  0.1434  9.55  &lt;0.0001 
+#&gt;  entity_count=1 -0.5698  0.2024 -2.82  0.0049  
+#&gt;  entity_count=2 -0.5674  0.3633 -1.56  0.1183  
+#&gt;  entity_count=3 -1.0333  0.6028 -1.71  0.0865  
+#&gt;  entity_count=4 -0.6766  1.2331 -0.55  0.5832  
+#&gt;  entity_count=5 -8.2753 31.6201 -0.26  0.7935  
+#&gt;  
+#&gt; entity_count=1 entity_count=2 entity_count=3 entity_count=4 entity_count=5 
+#&gt;       1.114813       1.088053       1.031909       1.007573       1.000011</code></pre>
 <pre class="r"><code>result2 &lt;- lrm(isCorrect ~ word_count, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ word_count, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>result2</code></pre>
-<pre><code>#&gt; Error in eval(expr, envir, enclos): 找不到物件 &#39;result2&#39;</code></pre>
-<pre class="r"><code>rms::vif(result2)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result2&#39;</code></pre>
-<pre class="r"><code># Should print out:
+              data = all_table, x = T, y = T)
+result2
+rms::vif(result2)
+# Should print out:
 # word_count=4   word_count=5   word_count=6   word_count=7   word_count=8   word_count=9   word_count=10  word_count=11  word_count=12  word_count=13 
 # 3.599987       7019.653314    18758.490454   13801.969785   47512.004279   19500.034849   43470.570492   40006.782365   28352.607740   18758.490454 
 # word_count=14  word_count=15  word_count=16  word_count=17  word_count=18  word_count=19  word_count=20  word_count=21  word_count=22  word_count=23 
@@ -220,66 +429,182 @@ all_table$neg_count &lt;- factor(all_table$neg_count)</code></pre>
 # 1.200000       1.200000       1.399999       1.200000       1.200000       1.200000       1.277192       1.200000       1.200000       1.200000 
 # word_count=178 word_count=194 word_count=249 
 # 1.200000       1.200000       1.200000 </code></pre>
+<pre><code>#&gt; Logistic Regression Model
+#&gt;  
+#&gt;  lrm(formula = isCorrect ~ word_count, data = all_table, x = T, 
+#&gt;      y = T)
+#&gt;  
+#&gt;                        Model Likelihood    Discrimination    Rank Discrim.    
+#&gt;                              Ratio Test           Indexes          Indexes    
+#&gt;  Obs           588    LR chi2    116.41    R2       0.264    C       0.758    
+#&gt;   0            152    d.f.           73    g        2.938    Dxy     0.516    
+#&gt;   1            436    Pr(&gt; chi2) 0.0009    gr      18.872    gamma   0.535    
+#&gt;  max |deriv| 0.002                         gp       0.198    tau-a   0.198    
+#&gt;                                            Brier    0.159                     
+#&gt;  
+#&gt;                 Coef     S.E.     Wald Z Pr(&gt;|Z|)
+#&gt;  Intercept       10.5403  86.9629  0.12  0.9035  
+#&gt;  word_count=4     0.0000 102.3290  0.00  1.0000  
+#&gt;  word_count=5    -7.8323  86.9691 -0.09  0.9282  
+#&gt;  word_count=6    -8.8057  86.9652 -0.10  0.9193  
+#&gt;  word_count=7    -7.9377  86.9660 -0.09  0.9273  
+#&gt;  word_count=8    -9.7984  86.9638 -0.11  0.9103  
+#&gt;  word_count=9    -8.5035  86.9651 -0.10  0.9221  
+#&gt;  word_count=10  -10.0703  86.9639 -0.12  0.9078  
+#&gt;  word_count=11   -9.6754  86.9640 -0.11  0.9114  
+#&gt;  word_count=12   -9.2594  86.9644 -0.11  0.9152  
+#&gt;  word_count=13   -8.8057  86.9652 -0.10  0.9193  
+#&gt;  word_count=14   -9.4417  86.9642 -0.11  0.9135  
+#&gt;  word_count=15   -8.2891  86.9661 -0.10  0.9241  
+#&gt;  word_count=16  -10.4403  86.9635 -0.12  0.9044  
+#&gt;  word_count=17   -8.7486  86.9663 -0.10  0.9199  
+#&gt;  word_count=18   -9.8472  86.9651 -0.11  0.9098  
+#&gt;  word_count=19   -9.5107  86.9645 -0.11  0.9129  
+#&gt;  word_count=20   -9.5848  86.9645 -0.11  0.9122  
+#&gt;  word_count=21  -10.1349  86.9641 -0.12  0.9072  
+#&gt;  word_count=22   -9.8472  86.9651 -0.11  0.9098  
+#&gt;  word_count=23  -10.5403  86.9646 -0.12  0.9035  
+#&gt;  word_count=24   -9.9526  86.9647 -0.11  0.9089  
+#&gt;  word_count=25   -9.6931  86.9657 -0.11  0.9113  
+#&gt;  word_count=26   -8.9309  86.9698 -0.10  0.9182  
+#&gt;  word_count=27   -9.1541  86.9701 -0.11  0.9162  
+#&gt;  word_count=28    0.0000 117.7484  0.00  1.0000  
+#&gt;  word_count=29   -9.4417  86.9706 -0.11  0.9135  
+#&gt;  word_count=30   -9.3617  86.9648 -0.11  0.9143  
+#&gt;  word_count=31  -10.7635  86.9655 -0.12  0.9015  
+#&gt;  word_count=32    0.0000 142.0099  0.00  1.0000  
+#&gt;  word_count=33  -10.5403  86.9744 -0.12  0.9035  
+#&gt;  word_count=34  -10.8280  86.9663 -0.12  0.9009  
+#&gt;  word_count=35   -9.8472  86.9716 -0.11  0.9099  
+#&gt;  word_count=36    0.0000 162.6928  0.00  1.0000  
+#&gt;  word_count=37    0.0000 122.9842  0.00  1.0000  
+#&gt;  word_count=38  -10.5403  86.9744 -0.12  0.9035  
+#&gt;  word_count=40  -10.5403  86.9744 -0.12  0.9035  
+#&gt;  word_count=41  -10.5403  86.9687 -0.12  0.9035  
+#&gt;  word_count=43   -9.1541  86.9701 -0.11  0.9162  
+#&gt;  word_count=44  -21.4475 186.6687 -0.11  0.9085  
+#&gt;  word_count=45  -21.4475 249.2545 -0.09  0.9314  
+#&gt;  word_count=46  -21.4475 249.2545 -0.09  0.9314  
+#&gt;  word_count=47    0.0000 162.6928  0.00  1.0000  
+#&gt;  word_count=49  -10.1349  86.9677 -0.12  0.9072  
+#&gt;  word_count=50  -10.5403  86.9744 -0.12  0.9035  
+#&gt;  word_count=51    0.0000 162.6928  0.00  1.0000  
+#&gt;  word_count=54    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=55    0.0000 142.0099  0.00  1.0000  
+#&gt;  word_count=56    0.0000 162.6928  0.00  1.0000  
+#&gt;  word_count=57    0.0000 162.6928  0.00  1.0000  
+#&gt;  word_count=59  -21.4475 249.2545 -0.09  0.9314  
+#&gt;  word_count=60    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=63    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=64    0.0000 162.6928  0.00  1.0000  
+#&gt;  word_count=65  -21.4475 249.2545 -0.09  0.9314  
+#&gt;  word_count=67    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=68    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=69  -10.5403  86.9744 -0.12  0.9035  
+#&gt;  word_count=72  -10.5403  86.9744 -0.12  0.9035  
+#&gt;  word_count=74  -21.4475 249.2545 -0.09  0.9314  
+#&gt;  word_count=81    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=82    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=85    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=91    0.0000 162.6928  0.00  1.0000  
+#&gt;  word_count=96    0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=101   0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=104   0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=106 -21.4475 186.6687 -0.11  0.9085  
+#&gt;  word_count=122   0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=129   0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=162   0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=178   0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=194   0.0000 213.0148  0.00  1.0000  
+#&gt;  word_count=249   0.0000 213.0148  0.00  1.0000  
+#&gt;  
+#&gt;   word_count=4   word_count=5   word_count=6   word_count=7   word_count=8 
+#&gt;       3.599987    7019.653314   18758.490454   13801.969785   47512.004279 
+#&gt;   word_count=9  word_count=10  word_count=11  word_count=12  word_count=13 
+#&gt;   19500.034849   43470.570492   40006.782365   28352.607740   18758.490454 
+#&gt;  word_count=14  word_count=15  word_count=16  word_count=17  word_count=18 
+#&gt;   32391.284615   13420.230319   67373.348168   12727.186861   19591.462318 
+#&gt;  word_count=19  word_count=20  word_count=21  word_count=22  word_count=23 
+#&gt;   26762.945420   26253.347874   34433.932246   19591.462318   25477.100791 
+#&gt;  word_count=24  word_count=25  word_count=26  word_count=27  word_count=28 
+#&gt;   23471.848098   15524.932524    6246.838094    5999.165768       2.199996 
+#&gt;  word_count=29  word_count=30  word_count=31  word_count=32  word_count=33 
+#&gt;    5627.319592   22375.196153   16406.429626       1.599999    3762.010342 
+#&gt;  word_count=34  word_count=35  word_count=36  word_count=37  word_count=38 
+#&gt;   12727.186861    5006.675466       1.399999       1.999997    3762.010342 
+#&gt;  word_count=40  word_count=41  word_count=43  word_count=44  word_count=45 
+#&gt;    3762.010342    7482.498227    5999.165768       1.277192       1.138596 
+#&gt;  word_count=46  word_count=47  word_count=49  word_count=50  word_count=51 
+#&gt;       1.138596       1.399999    8959.347093    3762.010342       1.399999 
+#&gt;  word_count=54  word_count=55  word_count=56  word_count=57  word_count=59 
+#&gt;       1.200000       1.599999       1.399999       1.399999       1.138596 
+#&gt;  word_count=60  word_count=63  word_count=64  word_count=65  word_count=67 
+#&gt;       1.200000       1.200000       1.399999       1.138596       1.200000 
+#&gt;  word_count=68  word_count=69  word_count=72  word_count=74  word_count=81 
+#&gt;       1.200000    3762.010342    3762.010342       1.138596       1.200000 
+#&gt;  word_count=82  word_count=85  word_count=91  word_count=96 word_count=101 
+#&gt;       1.200000       1.200000       1.399999       1.200000       1.200000 
+#&gt; word_count=104 word_count=106 word_count=122 word_count=129 word_count=162 
+#&gt;       1.200000       1.277192       1.200000       1.200000       1.200000 
+#&gt; word_count=178 word_count=194 word_count=249 
+#&gt;       1.200000       1.200000       1.200000</code></pre>
 <pre class="r"><code>result3 &lt;- lrm(isCorrect ~ above43, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ above43, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>rms::vif(result3)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result3&#39;</code></pre>
-<pre class="r"><code># above43=TRUE
+              data = all_table, x = T, y = T)
+rms::vif(result3)
+# above43=TRUE
 # 1</code></pre>
+<pre><code>#&gt; above43=TRUE 
+#&gt;            1</code></pre>
 <pre class="r"><code>result4 &lt;- lrm(isCorrect ~ ifQuestion, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ ifQuestion, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>rms::vif(result4)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result4&#39;</code></pre>
-<pre class="r"><code># ifQuestion=TRUE 
+              data = all_table, x = T, y = T)
+rms::vif(result4)
+# ifQuestion=TRUE 
 # 1 </code></pre>
+<pre><code>#&gt; ifQuestion=TRUE 
+#&gt;               1</code></pre>
 <pre class="r"><code>result5 &lt;- lrm(isCorrect ~ ifSign, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ ifSign, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>rms::vif(result5)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result5&#39;</code></pre>
-<pre class="r"><code># ifSign=TRUE 
+              data = all_table, x = T, y = T)
+rms::vif(result5)
+# ifSign=TRUE 
 # 1</code></pre>
+<pre><code>#&gt; ifSign=TRUE 
+#&gt;           1</code></pre>
 <pre class="r"><code>result6 &lt;- lrm(isCorrect ~ adj_count, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ adj_count, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>rms::vif(result6)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result6&#39;</code></pre>
-<pre class="r"><code># adj_count=1 adj_count=2 adj_count=3 adj_count=5 
+              data = all_table, x = T, y = T)
+rms::vif(result6)
+# adj_count=1 adj_count=2 adj_count=3 adj_count=5 
 # 1.011716    1.011709    1.000006    1.000003 </code></pre>
+<pre><code>#&gt; adj_count=1 adj_count=2 adj_count=3 adj_count=5 
+#&gt;    1.011716    1.011709    1.000006    1.000003</code></pre>
 <pre class="r"><code>result7 &lt;- lrm(isCorrect ~ ifSarcasm, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ ifSarcasm, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>rms::vif(result7)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result7&#39;</code></pre>
-<pre class="r"><code># ifSarcasm=TRUE 
+              data = all_table, x = T, y = T)
+rms::vif(result7)
+# ifSarcasm=TRUE 
 # 1 </code></pre>
+<pre><code>#&gt; ifSarcasm=TRUE 
+#&gt;              1</code></pre>
 <pre class="r"><code>result8 &lt;- lrm(isCorrect ~ conj_count, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ conj_count, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>rms::vif(result8)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result8&#39;</code></pre>
-<pre class="r"><code># conj_count=1 conj_count=2 
+              data = all_table, x = T, y = T)
+rms::vif(result8)
+# conj_count=1 conj_count=2 
 # 1            1</code></pre>
+<pre><code>#&gt; conj_count=1 conj_count=2 
+#&gt;            1            1</code></pre>
 <pre class="r"><code>result9 &lt;- lrm(isCorrect ~ neg_count, 
-               data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ neg_count, data = all_table, x = T, y = T): 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>rms::vif(result9)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result9&#39;</code></pre>
-<pre class="r"><code># neg_count=1 neg_count=2 neg_count=3 neg_count=4 
+               data = all_table, x = T, y = T)
+rms::vif(result9)
+# neg_count=1 neg_count=2 neg_count=3 neg_count=4 
 # 1.011437    1.011434    1.000003    1.000001 </code></pre>
+<pre><code>#&gt; neg_count=1 neg_count=2 neg_count=3 neg_count=4 
+#&gt;    1.011437    1.011434    1.000003    1.000001</code></pre>
 </div>
 <div id="lrm-result-as-a-whole" class="section level1">
 <h1>LRM result (as a whole)</h1>
 <pre class="r"><code>result &lt;- lrm(isCorrect ~ entity_count + ifQuestion + ifSign + above43 + adj_count + ifSarcasm + conj_count + neg_count, 
-              data = all_table, x = T, y = T)</code></pre>
-<pre><code>#&gt; Error in lrm(isCorrect ~ entity_count + ifQuestion + ifSign + above43 + : 沒有這個函數 &quot;lrm&quot;</code></pre>
-<pre class="r"><code>result</code></pre>
-<pre><code>#&gt; Error in eval(expr, envir, enclos): 找不到物件 &#39;result&#39;</code></pre>
-<pre class="r"><code>rms::vif(result)</code></pre>
-<pre><code>#&gt; Error in vcov(fit, regcoef.only = TRUE): 找不到物件 &#39;result&#39;</code></pre>
-<pre class="r"><code># Should print out:
+              data = all_table, x = T, y = T)
+result
+rms::vif(result)
+# Should print out:
 # entity_count=1  entity_count=2  entity_count=3 entity_count=4  entity_count=5 
 # 1.136782        1.138409        1.215401       1.049619        1.000025 
 # ifQuestion=TRUE 
@@ -296,6 +621,50 @@ all_table$neg_count &lt;- factor(all_table$neg_count)</code></pre>
 # 1.032168        1.000002 
 # neg_count=1     neg_count=2     neg_count=3     neg_count=4 
 # 1.024981        1.212894        1.000075        1.349358 </code></pre>
+<pre><code>#&gt; Logistic Regression Model
+#&gt;  
+#&gt;  lrm(formula = isCorrect ~ entity_count + ifQuestion + ifSign + 
+#&gt;      above43 + adj_count + ifSarcasm + conj_count + neg_count, 
+#&gt;      data = all_table, x = T, y = T)
+#&gt;  
+#&gt;                          Model Likelihood    Discrimination    Rank Discrim.    
+#&gt;                                Ratio Test           Indexes          Indexes    
+#&gt;  Obs            588    LR chi2      81.30    R2       0.190    C       0.671    
+#&gt;   0             152    d.f.            19    g        1.435    Dxy     0.342    
+#&gt;   1             436    Pr(&gt; chi2) &lt;0.0001    gr       4.198    gamma   0.366    
+#&gt;  max |deriv| 0.0006                          gp       0.131    tau-a   0.131    
+#&gt;                                              Brier    0.165                     
+#&gt;  
+#&gt;                  Coef     S.E.     Wald Z Pr(&gt;|Z|)
+#&gt;  Intercept         1.5004   0.1954  7.68  &lt;0.0001 
+#&gt;  entity_count=1   -0.5464   0.2194 -2.49  0.0128  
+#&gt;  entity_count=2   -0.6257   0.3981 -1.57  0.1161  
+#&gt;  entity_count=3   -1.5442   0.6439 -2.40  0.0165  
+#&gt;  entity_count=4   -1.8288   1.4580 -1.25  0.2097  
+#&gt;  entity_count=5  -11.4123 141.6835 -0.08  0.9358  
+#&gt;  ifQuestion=TRUE -11.2191  52.9817 -0.21  0.8323  
+#&gt;  ifSign=TRUE       0.2251   0.2409  0.93  0.3501  
+#&gt;  above43=TRUE      0.2721   0.4605  0.59  0.5546  
+#&gt;  adj_count=1      -0.2386   0.2409 -0.99  0.3219  
+#&gt;  adj_count=2      -0.4924   0.6183 -0.80  0.4258  
+#&gt;  adj_count=3       7.5016  70.0928  0.11  0.9148  
+#&gt;  adj_count=5     -11.2136 100.1861 -0.11  0.9109  
+#&gt;  ifSarcasm=TRUE  -11.1634  42.1307 -0.26  0.7910  
+#&gt;  conj_count=1     -0.4536   0.5606 -0.81  0.4184  
+#&gt;  conj_count=2    -10.8477 141.6821 -0.08  0.9390  
+#&gt;  neg_count=1       0.0433   0.2620  0.17  0.8686  
+#&gt;  neg_count=2      -0.0654   0.5514 -0.12  0.9055  
+#&gt;  neg_count=3       8.0921  44.9912  0.18  0.8573  
+#&gt;  neg_count=4       1.8699 137.2068  0.01  0.9891  
+#&gt;  
+#&gt;  entity_count=1  entity_count=2  entity_count=3  entity_count=4  entity_count=5 
+#&gt;        1.155084        1.126437        1.096799        1.054796        1.000025 
+#&gt; ifQuestion=TRUE     ifSign=TRUE    above43=TRUE     adj_count=1     adj_count=2 
+#&gt;        1.000003        1.197165        1.327884        1.054938        1.043982 
+#&gt;     adj_count=3     adj_count=5  ifSarcasm=TRUE    conj_count=1    conj_count=2 
+#&gt;        1.353272        1.000040        1.000006        1.029835        1.000004 
+#&gt;     neg_count=1     neg_count=2     neg_count=3     neg_count=4 
+#&gt;        1.026136        1.215459        1.000074        1.353315</code></pre>
 <p>If <code>word_count</code> is considered factors in the lrm, error message pops out: singular information matrix in lrm.fit (rank= 90 ). Offending variable(s):neg_count=4 adj_count=5 above43 Warning message: In lrm(isCorrect ~ entity_count + word_count + ifQuestion + ifSign + : Unable to fit model using “lrm.fit”</p>
 </div>
 
