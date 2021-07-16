@@ -5,14 +5,15 @@ date: "2021/7/15"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE,comment = '#>',error=TRUE, results = 'hold', out.width='70%')
 ```
 
-```{r load data, include = FALSE}
+```{r load data}
 library(rjson)
 library(readxl)
 library(dplyr)
+library(rms)
 
 json_list <- fromJSON(file="C:/Users/user/Desktop/University/Extra Studies & Others'/Classic Thesis/Linguistics/semantics/ABSA/Linguistic Function/cht0714_ctxdep.json")
 seeds_loc <- "C:/Users/user/Desktop/University/Extra Studies & Others'/Classic Thesis/Linguistics/semantics/ABSA/Linguistic Function/seeds_(客服)_1100223.xlsx"
@@ -58,7 +59,7 @@ predict_error<-predict$error %>%
 ```
 
 # Data Manipulation
-```{r entity counts, echo=FALSE}
+```{r entity counts}
 # collect entities in `seeds` into `entities`
 entities<-seeds$`seeds (客服)0223`[2:7,3:25]%>%as_tibble()
 
@@ -83,17 +84,17 @@ all_table<-left_join(df, predict_error, by=c("text"="contexts"))%>%
     mutate(entity_count = ent_num(token_dep))
 ```
 
-```{r sentence length, echo=FALSE}
+```{r sentence length}
 all_table<-all_table%>%mutate(word_count = nchar(text))
 ```
 
-```{r longer than 43, echo=FALSE}
+```{r longer than 43}
 all_table<-all_table%>%
     mutate(above43 = if_else(condition = as.numeric(word_count)>43, 
                                      true = TRUE, false = FALSE))
 ```
 
-```{r rhetorical question, echo=FALSE}
+```{r rhetorical question}
 findqs<-function(x){
     return(grepl("rhetorical", x))
 }
@@ -102,7 +103,7 @@ all_table<-all_table%>%
 # flaw: cannot see unannotated predictions that might be either correct or wrong
 ```
 
-```{r sign counts, echo=FALSE}
+```{r sign counts}
 findsign<-function(x){
     return(grepl("[>=<^❤️🤔🤔🤣🥺😂]", x))
 }
@@ -110,7 +111,7 @@ all_table<-all_table%>%
     mutate(ifSign = findsign(text))
 ```
 
-```{r adjective counts, echo=FALSE}
+```{r adjective counts}
 mostly_adj<-all_table$token_dep%>%
     as.character%>%
     strsplit("(\u3000)|(\", \")")%>%
@@ -133,7 +134,7 @@ all_table<-all_table%>%
     mutate(adj_count = adj_num(token_dep))
 ```
 
-```{r sarcasm, echo=FALSE}
+```{r sarcasm}
 # (annotators' choice)
 findsarcasm<-function(x){
     return(grepl("sarcasm", x))
@@ -143,7 +144,7 @@ all_table<-all_table%>%
 # flaw: cannot see unannotated predictions that might be either correct or wrong
 ```
 
-```{r conjugation counts, echo=FALSE}
+```{r conjugation counts}
 conj_num<-function(x){
     conjunctions<-c("但", "除(了|外|非)?", "卻")
     TFlist<-list()
@@ -160,7 +161,7 @@ all_table<-all_table%>%
     mutate(conj_count = conj_num(token_dep))
 ```
 
-```{r negation counts, echo = FALSE}
+```{r negation counts}
 neg_num<-function(x){
     negations<-c("不", "沒有")
     TFlist<-list()
@@ -178,10 +179,10 @@ all_table<-all_table%>%
 ```
 
 # LRM result (one by one)
-```{r factorize, warning = FALSE}
+```{r factorize}
 all_table$isCorrect <- factor(all_table$isCorrect)
 all_table$entity_count <- factor(all_table$entity_count)
-all_table$word_count <- factor(all_table$word_count) 
+# all_table$word_count <- factor(all_table$word_count) 
 all_table$ifQuestion <- factor(all_table$ifQuestion)
 all_table$ifSign <- factor(all_table$ifSign)
 all_table$above43 <- factor(all_table$above43)
@@ -191,7 +192,7 @@ all_table$conj_count <- factor(all_table$conj_count)
 all_table$neg_count <- factor(all_table$neg_count)
 ```
 
-```{r entity counts, warning = FALSE}
+```{r entity counts results}
 result1 <- lrm(isCorrect ~ entity_count, 
               data = all_table, x = T, y = T)
 result1
@@ -201,7 +202,7 @@ rms::vif(result1)
 # 1.114813       1.088053       1.031909       1.007573       1.000011 
 ```
 
-```{r sentence length, warning = FALSE}
+```{r sentence length results}
 result2 <- lrm(isCorrect ~ word_count, 
               data = all_table, x = T, y = T)
 result2
@@ -225,64 +226,71 @@ rms::vif(result2)
 # 1.200000       1.200000       1.200000 
 ```
 
-```{r longer than 43, warning = FALSE}
+```{r longer than 43 results}
 result3 <- lrm(isCorrect ~ above43, 
               data = all_table, x = T, y = T)
+result3
 rms::vif(result3)
 # above43=TRUE
 # 1
 ```
 
-```{r rhetorical question, warning = FALSE}
+```{r rhetorical question results}
 result4 <- lrm(isCorrect ~ ifQuestion, 
               data = all_table, x = T, y = T)
+result4
 rms::vif(result4)
 # ifQuestion=TRUE 
 # 1 
 ```
 
-```{r sign counts, warning = FALSE}
+```{r sign counts results}
 result5 <- lrm(isCorrect ~ ifSign, 
               data = all_table, x = T, y = T)
+result5
 rms::vif(result5)
 # ifSign=TRUE 
 # 1
 ```
 
-```{r adjective counts, warning = FALSE}
+```{r adjective counts results}
 result6 <- lrm(isCorrect ~ adj_count, 
               data = all_table, x = T, y = T)
+result6
 rms::vif(result6)
 # adj_count=1 adj_count=2 adj_count=3 adj_count=5 
 # 1.011716    1.011709    1.000006    1.000003 
 ```
 
-```{r sarcasm, warning = FALSE}
+```{r sarcasm results}
 result7 <- lrm(isCorrect ~ ifSarcasm, 
               data = all_table, x = T, y = T)
+result7
 rms::vif(result7)
 # ifSarcasm=TRUE 
 # 1 
 ```
 
-```{r conjugation counts, warning = FALSE}
+```{r conjugation counts results}
 result8 <- lrm(isCorrect ~ conj_count, 
               data = all_table, x = T, y = T)
+result8
 rms::vif(result8)
 # conj_count=1 conj_count=2 
 # 1            1
 ```
 
-```{r negation counts, warning = FALSE}
+```{r negation counts results}
 result9 <- lrm(isCorrect ~ neg_count, 
                data = all_table, x = T, y = T)
+result9
 rms::vif(result9)
 # neg_count=1 neg_count=2 neg_count=3 neg_count=4 
 # 1.011437    1.011434    1.000003    1.000001 
 ```
 
 # LRM result (as a whole)
-```{r result, warning = FALSE}
+```{r result}
 result <- lrm(isCorrect ~ entity_count + ifQuestion + ifSign + above43 + adj_count + ifSarcasm + conj_count + neg_count, 
               data = all_table, x = T, y = T)
 result
@@ -311,3 +319,26 @@ singular information matrix in lrm.fit (rank= 90 ).  Offending variable(s):neg_c
 Warning message:
 In lrm(isCorrect ~ entity_count + word_count + ifQuestion + ifSign +  :
 Unable to fit model using “lrm.fit”
+
+```{r sentence count}
+all_table <- all_table %>%
+    mutate(sentence_count = text %>%
+               strsplit(split = "( |？|！|，|。)") %>%
+               unlist() %>%
+               length())
+```
+
+```{r sentence count result}
+result10 <- lrm(isCorrect ~ sentence_count, 
+              data = all_table, x = T, y = T)
+result10
+rms::vif(result10)
+```
+
+```{r sentence count as factor result}
+fac10 <- factor(all_table$sentence_count)
+result_fac10 <- lrm(isCorrect ~ fac10, 
+              data = all_table, x = T, y = T)
+result_fac10
+rms::vif(result_fac10)
+```
